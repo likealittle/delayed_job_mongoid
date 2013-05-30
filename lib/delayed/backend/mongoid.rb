@@ -108,13 +108,13 @@ module Delayed
             # The first time the worker boots up.
             clear_locks!(worker.name)
           end
-          if rand(10) == 0
+          if rand(10) == 0 || Rails.env.test?
             # Once in 10 jobs, move from `Waiting` to `Pending to execute`
             mark_ready_to_execute
           end
           # Make sure we run housekeeping at-least once in a while, but not
           # too frequently.
-          return if @@last_housekeeping and @@last_housekeeping < max_run_time.seconds.ago
+          return if @@last_housekeeping and @@last_housekeeping < max_run_time.seconds.ago and !Rails.env.test?
           @@last_housekeeping = Time.now
 
           # If someone else holds bad locks, clear them too.
