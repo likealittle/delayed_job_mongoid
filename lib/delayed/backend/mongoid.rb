@@ -49,7 +49,7 @@ module Delayed
 
         # When the worker comes up, find everyone who is locked by me, and unlock them.
         # Also used to unlocked workers who are locked for a long time.
-        index :locked_by, sparse: true
+        index({:locked_by => 1}, {sparse: true})
 
         # Moving from `Pending to execute` state to `Running`
         index({:is_ready => 1, :priority => 1}, sparse: true)
@@ -57,7 +57,7 @@ module Delayed
         # Used to mark jobs ready to run as `is_ready` true.
         # Only `is_ready` of nil can have non-nil `run_at`
         # Moving from `Waiting` state to `Pending to execute`
-        index :run_at, sparse: true
+        index({:run_at => 1}, {sparse: true})
 
         before_save :set_default_run_at
         before_save :set_default_is_ready
@@ -68,7 +68,7 @@ module Delayed
         end
 
         def set_default_is_ready
-          if run_at and run_at <= db_time_now
+          if run_at and run_at <= Time.now.utc
             self.is_ready = true
             self.run_at = nil
           elsif run_at
@@ -93,7 +93,7 @@ module Delayed
           criteria = criteria.any_in(:queue => Worker.queues) if Worker.queues.any?
 
           criteria.asc(:priority).find_and_modify(
-            {"$set" => {:locked_at => db_time_now, :locked_by => worker.name,
+            {"$set" => {:locked_at => Time.now.utc, :locked_by => worker.name,
               :run_at => nil, :is_ready => nil} }, :new => true
           )
         end
@@ -110,8 +110,7 @@ module Delayed
           end
           if rand(10) == 0
             # Once in 10 jobs, move from `Waiting` to `Pending to execute`
-            self.where(is_ready: nil, run_at: {'$lt' => db_time_now}).
-              update_all(pending_to_execute_state)
+            mark_ready_to_execute
           end
           # Make sure we run housekeeping at-least once in a while, but not
           # too frequently.
@@ -119,9 +118,18 @@ module Delayed
           @@last_housekeeping = Time.now
 
           # If someone else holds bad locks, clear them too.
-          self.where(:locked_by => {'$ne' => nil}, 
-            :locked_at => {'$lt' => db_time_now - max_run_time}).
-            update_all(pending_to_execute_state)
+          unlock_old_locked(max_run_time)
+        end
+
+        def self.mark_ready_to_execute
+          self.where(is_ready: nil, run_at: {'$lt' => Time.now.utc}).
+              update_all(pending_to_execute_state)
+        end
+
+        def self.unlock_old_locked(max_run_time)
+          self.where(:locked_by => {'$ne' => nil},
+            :locked_at => {'$lt' => Time.now.utc - max_run_time}).
+            update_all(pending_to_execute_state)          
         end
 
         # When a worker is exiting, make sure we don't have any locked jobs.
