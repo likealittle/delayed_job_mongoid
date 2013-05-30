@@ -71,7 +71,7 @@ module Delayed
           if run_at and run_at <= db_time_now
             self.is_ready = true
             self.run_at = nil
-          else
+          elsif run_at
             self.is_ready = nil
           end
           return true
