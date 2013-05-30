@@ -110,7 +110,7 @@ module Delayed
           end
           if rand(10) == 0
             # Once in 10 jobs, move from `Waiting` to `Pending to execute`
-            self.where(is_ready: nil, run_at: {'$gt' => db_time_now}).
+            self.where(is_ready: nil, run_at: {'$lt' => db_time_now}).
               update_all(pending_to_execute_state)
           end
           # Make sure we run housekeeping at-least once in a while, but not
