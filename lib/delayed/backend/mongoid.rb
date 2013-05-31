@@ -100,7 +100,7 @@ module Delayed
         end
 
         def self.pending_to_execute_state
-          {:locked_at => nil, :locked_by => nil, :is_ready => true}
+          {:locked_at => nil, :locked_by => nil, :is_ready => true, :run_at => nil}
         end
 
         @@last_housekeeping = nil
