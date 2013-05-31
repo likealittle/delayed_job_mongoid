@@ -91,6 +91,7 @@ module Delayed
           criteria = criteria.gte(:priority => Worker.min_priority.to_i) if Worker.min_priority
           criteria = criteria.lte(:priority => Worker.max_priority.to_i) if Worker.max_priority
           criteria = criteria.any_in(:queue => Worker.queues) if Worker.queues.any?
+          criteria = criteria.extras(:hint => {:is_ready => 1, :priority => 1})
 
           criteria.asc(:priority).find_and_modify(
             {"$set" => {:locked_at => Time.now.utc, :locked_by => worker.name,
@@ -123,6 +124,7 @@ module Delayed
 
         def self.mark_ready_to_execute
           self.where(is_ready: nil, run_at: {'$lt' => Time.now.utc}).
+              extras(:hint => {:run_at => 1}).
               update_all(pending_to_execute_state)
         end
 
