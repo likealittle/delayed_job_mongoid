@@ -82,6 +82,10 @@ module Delayed
           self.run_at = self.is_ready = self.locked_at = self.locked_by = nil
         end
 
+        def fail!
+          self.failed_at = self.class.db_time_now
+        end
+
         # Reserves this job for the worker.
         def self.reserve(worker, max_run_time = Worker.max_run_time)
           housekeeping(worker, max_run_time)
@@ -105,10 +109,6 @@ module Delayed
 
         @@last_housekeeping = nil
         def self.housekeeping(worker, max_run_time)
-          unless @@last_housekeeping
-            # The first time the worker boots up.
-            clear_locks!(worker.name)
-          end
           if rand(10) == 0 || Rails.env.test?
             # Once in 10 jobs, move from `Waiting` to `Pending to execute`
             mark_ready_to_execute
@@ -131,7 +131,7 @@ module Delayed
         def self.unlock_old_locked(max_run_time)
           self.where(:locked_by => {'$ne' => nil},
             :locked_at => {'$lt' => Time.now.utc - max_run_time}).
-            update_all(pending_to_execute_state)          
+            update_all(pending_to_execute_state)
         end
 
         # When a worker is exiting, make sure we don't have any locked jobs.
