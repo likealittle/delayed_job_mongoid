@@ -84,6 +84,7 @@ module Delayed
 
         def fail!
           self.failed_at = self.class.db_time_now
+          save
         end
 
         # Reserves this job for the worker.
