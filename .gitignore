@@ -22,3 +22,4 @@ pkg
 ## PROJECT::SPECIFIC
 .bundle/config
 .rvmrc
+nbproject

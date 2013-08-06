@@ -50,14 +50,15 @@ module Delayed
         # When the worker comes up, find everyone who is locked by me, and unlock them.
         # Also used to unlocked workers who are locked for a long time.
         index({:locked_by => 1}, {sparse: true})
+        index({:locked_at => 1}, {sparse: true})
 
         # Moving from `Pending to execute` state to `Running`
-        index({:is_ready => 1, :priority => 1}, sparse: true)
+        index({:is_ready => 1, :priority => 1}, {sparse: true})
 
         # Used to mark jobs ready to run as `is_ready` true.
         # Only `is_ready` of nil can have non-nil `run_at`
         # Moving from `Waiting` state to `Pending to execute`
-        index({:run_at => 1}, {sparse: true})
+        index({:is_ready => 1, :run_at => 1}, {background: true})
 
         before_save :set_default_run_at
         before_save :set_default_is_ready
@@ -124,14 +125,12 @@ module Delayed
         end
 
         def self.mark_ready_to_execute
-          self.where(is_ready: nil, run_at: {'$lt' => Time.now.utc}).
-              extras(:hint => {:run_at => 1}).
-              update_all(pending_to_execute_state)
+          self.where(is_ready: nil, :run_at.lt => Time.now.utc).
+            update_all(pending_to_execute_state)
         end
 
         def self.unlock_old_locked(max_run_time)
-          self.where(:locked_by => {'$ne' => nil},
-            :locked_at => {'$lt' => Time.now.utc - max_run_time}).
+          self.where(:locked_at.lt => Time.now.utc - max_run_time).
             update_all(pending_to_execute_state)
         end
 
